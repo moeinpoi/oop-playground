@@ -79,19 +79,37 @@ public:
 };
 
 
+class Course;
+
+class GradingPolicy {
+public:
+    virtual ~GradingPolicy() = default;
+    virtual double get_course_ave() const = 0;
+public:
+    Course* m_course;
+};
+
+
 class Course {
 public:
-    Course(GradingPolicy* gradingPolicy) : m_gradingPolicy(gradingPolicy) {m_students = {};}
+    Course(GradingPolicy* gradingPolicy) : m_gradingPolicy(gradingPolicy) {
+        m_students = {};
+        m_gradingPolicy->m_course = this; 
+    }
     Course(Student* student, GradingPolicy* gradingPolicy) : m_gradingPolicy(gradingPolicy) {
-        m_students.push_back(student);}
+        m_students.push_back(student);
+        m_gradingPolicy->m_course = this; 
+    }
     Course(std::vector<Student*> students, GradingPolicy* gradingPolicy) : m_gradingPolicy(gradingPolicy) {
         for (auto student : students) {
             m_students.push_back(student);
+            m_gradingPolicy->m_course = this; 
         }
     }
 
     void switch_policy(GradingPolicy* gradingPolicy) {
         m_gradingPolicy = gradingPolicy;
+        m_gradingPolicy->m_course = this; 
     }
 
     void enroll_student(Student* student) {
@@ -103,10 +121,17 @@ public:
         }
     }
 
-    void printRoster() const {
+    void print_roster() const {
         for (auto student : m_students) {
             std::cout << "- " << student->getName() << ": Average= " << student->getAve() << std::endl;
         }
+    }
+
+    void print_course_ave() const {
+        double ave = m_gradingPolicy->get_course_ave();
+
+        if (ave == -1) std::cout << "There are no eleigible students to calculate class average!" << std::endl;
+        else std::cout << "Class average is: " << ave << std::endl;
     }
 
 public:
@@ -115,50 +140,63 @@ public:
 };
 
 
-class GradingPolicy {
-public:
-    virtual ~GradingPolicy() = default;
-    virtual double get_course_ave() = 0;
-};
 
-
-class StraightAverage : public GradingPolicy , public Course {
+class StraightAverage : public GradingPolicy {
 public:
     virtual ~StraightAverage() = default;
-    double get_course_ave() override {
+    double get_course_ave() const override {
         double courseTot = 0;
-        for (auto student : m_students) {
+        for (auto student : m_course->m_students) {
             courseTot += student->getAve();
         }
-        return m_students.empty() ? 0 : courseTot / m_students.size();
+        return m_course->m_students.empty() ? -1 : courseTot / m_course->m_students.size();
     }
 };
 
 
-class IgnoreEmpty : public GradingPolicy , public Course {
+class IgnoreEmpty : public GradingPolicy {
 public:
     virtual ~IgnoreEmpty() = default;
-    double get_course_ave() override {
+    double get_course_ave() const override {
         double courseTot = 0;
         int count = 0;
-        for (auto student : m_students) {
+        for (auto student : m_course->m_students) {
             if (student->m_grades.size() != 0) { 
                 courseTot += student->getAve();
                 count++;
+            }
         }
-        return m_students.empty() ? 0 : courseTot / count;
+        return m_course->m_students.empty() ? -1 : courseTot / count;
     }
 };
 
 
-class DropLowestK : public GradingPolicy, public Course {
+class DropLowestK : public GradingPolicy {
 public:
     virtual ~DropLowestK() = default;
-    double get_course_ave() override {
-
-
+    DropLowestK(int _k) : m_k(_k) {}
+    double get_course_ave() const override {
+        std::vector<double> s_grades;
+        std::vector<std::vector<double>> all_grades;
+        for (auto student : m_course->m_students) {
+            s_grades = student->m_grades;
+            std::sort(s_grades.begin(), s_grades.end());
+            for (int i = 0; i < m_k; i++) {
+                s_grades.pop_back();
+            }
+            if (!s_grades.empty()) all_grades.push_back(s_grades);
+        }
+        double s_sum;
+        for (auto grades : all_grades) {
+            for (double grade : grades) {
+                s_sum += grade;
+            }
+        }
+        return m_course->m_students.empty() ? -1 : s_sum / all_grades.size();
     }
-    
+
+private:
+    int m_k;
 };
 
 
@@ -180,12 +218,20 @@ int main () {
     Foe.m_grades.push_back(7);
     Foe.m_grades.push_back(12);
 
-    std::vector<Student*> additionalStudents = {&Foe};
+    UnderGradStudent Sam("Sam");
 
-    Course FluidMech(&Moe);
+    std::vector<Student*> additionalStudents = {&Foe, &Sam};
+
+    StraightAverage straight_average;
+    IgnoreEmpty ignore_empty;
+    DropLowestK drop_lowest(2);
+
+    Course FluidMech(&Moe, &straight_average);
     FluidMech.enroll_student(&Joe);
     FluidMech.enroll_student(additionalStudents);
 
-    for (auto student : FluidMech.m_students)
-        student->printInfo();
+    for (auto student : FluidMech.m_students)  student->printInfo();
+
+    FluidMech.print_course_ave();
+    
 }
