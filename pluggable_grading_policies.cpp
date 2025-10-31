@@ -21,12 +21,20 @@ public:
     }  
     virtual std::string getRole() const = 0;
     virtual double getAve() const = 0;
-    virtual double getBaseAve() const {
+    virtual double getAve(std::vector<double> grades) const = 0;
+    double getBaseAve() const {
         double sum = 0;
         for(double grade : m_grades) {
             sum += grade;
         }
         return m_grades.empty() ? 0 : sum / m_grades.size();
+    }
+    double getBaseAve(std::vector<double> grades) const {
+        double sum = 0;
+        for(double grade : grades) {
+            sum += grade;
+        }
+        return grades.empty() ? 0 : sum / grades.size();
     }
     const std::string& getName() const { return m_name;}
 
@@ -42,6 +50,9 @@ public:
     double getAve() const override {
         return getBaseAve();
     }
+    double getAve(std::vector<double> grades) const override {
+        return getBaseAve(grades);
+    }
     std::string getRole() const override { return "Undergraduate";}
 };
 
@@ -53,6 +64,10 @@ public:
         double base = getBaseAve();
         return (base*0.7) + (m_thesisScore*0.3);
     }
+    double getAve(std::vector<double> grades) const override {
+        double base = getBaseAve(grades);
+        return (base*0.7) + (m_thesisScore*0.3);
+    }
     std::string getRole() const override { return "Graduate";}
 
 public:
@@ -60,12 +75,21 @@ public:
 };
 
 
-class ExchangeStudent : public Student{
+class ExchangeStudent : public Student {
 public:
     ExchangeStudent(const std::string& name, int topScoreCount) : Student(name) , m_topScoreCount(topScoreCount) {};
     double getAve() const override {
         double sum = 0;
         std::vector<double> grades = m_grades;
+        std::sort(grades.begin(), grades.end(), std::greater<double>());
+        for (int i = 0; i < m_topScoreCount; i++) {
+            sum += grades[i];
+        }
+        return  !m_topScoreCount ? 0 : sum / m_topScoreCount;
+    }
+    double getAve(std::vector<double> igrades) const override {
+        double sum = 0;
+        std::vector<double> grades = igrades;
         std::sort(grades.begin(), grades.end(), std::greater<double>());
         for (int i = 0; i < m_topScoreCount; i++) {
             sum += grades[i];
@@ -176,23 +200,19 @@ public:
     virtual ~DropLowestK() = default;
     DropLowestK(int _k) : m_k(_k) {}
     double get_course_ave() const override {
+        double classTot = 0;
         std::vector<double> s_grades;
-        std::vector<std::vector<double>> all_grades;
+        int count = 0;
         for (auto student : m_course->m_students) {
             s_grades = student->m_grades;
-            std::sort(s_grades.begin(), s_grades.end());
+            std::sort(s_grades.begin(), s_grades.end(), std::greater<double>());
             for (int i = 0; i < m_k; i++) {
-                s_grades.pop_back();
+                if(!s_grades.empty()) s_grades.pop_back();
             }
-            if (!s_grades.empty()) all_grades.push_back(s_grades);
+            count ++;
+            classTot += student->getAve(s_grades);
         }
-        double s_sum;
-        for (auto grades : all_grades) {
-            for (double grade : grades) {
-                s_sum += grade;
-            }
-        }
-        return m_course->m_students.empty() ? -1 : s_sum / all_grades.size();
+        return !count ? -1 : classTot / count;
     }
 
 private:
@@ -218,20 +238,21 @@ int main () {
     Foe.m_grades.push_back(7);
     Foe.m_grades.push_back(12);
 
-    UnderGradStudent Sam("Sam");
+    // UnderGradStudent Sam("Sam");
 
-    std::vector<Student*> additionalStudents = {&Foe, &Sam};
+    std::vector<Student*> additionalStudents = {&Foe};
 
     StraightAverage straight_average;
     IgnoreEmpty ignore_empty;
-    DropLowestK drop_lowest(2);
+    DropLowestK drop_lowest(1);
 
-    Course FluidMech(&Moe, &straight_average);
+    Course FluidMech(&Moe, &drop_lowest);
     FluidMech.enroll_student(&Joe);
     FluidMech.enroll_student(additionalStudents);
 
     for (auto student : FluidMech.m_students)  student->printInfo();
-
+    FluidMech.print_course_ave();
+    FluidMech.switch_policy(&ignore_empty);
     FluidMech.print_course_ave();
     
 }
