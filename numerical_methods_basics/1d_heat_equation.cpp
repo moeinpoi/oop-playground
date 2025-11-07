@@ -79,7 +79,7 @@ struct NeumannBC1D : BoundaryCondition1D {
 /*--------------*/
 
 struct Laplacian1D {
-    void apply(Field1D* field) {
+    static void apply(Field1D* field) {
         double h = field->m_grid->m_elSize;
         for (int node = 1; node < (field->m_grid->m_numNode)-1; node++ ) {
             field->m_d2f_dx2[node] = (field->m_f[node+1] + field->m_f[node-1] - 2*field->m_f[node]) /  h*h;
@@ -89,77 +89,96 @@ struct Laplacian1D {
 
 /*--------------*/
 
-struct TimeIntegrator {
+class LogFields {
+public:
+    LogFields(int stride) : 
+        m_stride(stride) {}
+    //print fields every m_stride steps
+    void logFieldState(Field1D* field, int step) {
+        if (step % m_stride == 0) {
+            for (int node = 0; node < field->m_grid->m_numNode ; node++) {
+                std::cout << "Node: " << node << ", x= " << field->m_grid->x[node] << ",    temp= " << field->m_f[node] << ",   at step " << step << std::endl;
+            }
+        }
+    }
+private:
+    int m_stride; //print every stride timesteps
+};
+
+/*--------------*/
+
+class TimeIntegrator {
+public:
     TimeIntegrator(double dt, double totTime) : 
         m_dt(dt),
         m_totTime(totTime),
         m_step(0),
-        m_nextStep(1) {
+        m_nextStep(m_step+1) {
             m_nSteps = (m_totTime / m_dt) + 1;
         }
+    virtual void march() = 0;
     
+protected:
+    friend class HeatProblem1D; //should later be generelied to an overarching Problem class
     double m_totTime;
     double m_dt;
     int m_step, m_nextStep;
     int m_nSteps; //total number of steps
+    
 };
 
 /*--------------*/
 
 class HeatProblem1D {
 public:
-    HeatProblem1D(double alpha, std::function<void(Field1D*)> initCond) :
+    HeatProblem1D(Field1D* field, double alpha, std::function<void(Field1D*)> initCond) :
+        m_field(field),
         m_alpha(alpha),
         m_initCond(initCond) {}
 
-    double operator()(Field1D* field, TimeIntegrator* timeIntegrator, Laplacian1D* laplacian, int node) {
-        return m_alpha*(timeIntegrator->m_dt)*(field->m_d2f_dx2[node]) + field->m_f[node];
+    double operator()(TimeIntegrator* timeIntegrator, int node) {
+        return m_alpha*(timeIntegrator->m_dt)*(m_field->m_d2f_dx2[node]) + m_field->m_f[node];
     }
     
-public:
+private:
     double m_alpha;
+
+public:
+    Field1D* m_field;
     std::function<void(Field1D*)> m_initCond;
 };
-
-void logFieldState(Field1D* field, int step) {
-    for (int node = 0; node < field->m_grid->m_numNode ; node++) {
-        std::cout << "Node: " << node << ", x= " << field->m_grid->x[node] << ",    temp= " << field->m_f[node] << ",   at step " << step << std::endl;
-    }
-}
 
 /*--------------*/
 
 
-struct ExplicitEuler {
-    ExplicitEuler(HeatProblem1D* heatProblem, TimeIntegrator* timeIntegrator, Field1D* field, Laplacian1D* laplacian) :
+class ExplicitEuler : public TimeIntegrator {
+public:
+    ExplicitEuler(HeatProblem1D* heatProblem, LogFields* logger, double dt, double totTime) :
+        TimeIntegrator(dt, totTime),
         m_heatProblem(heatProblem),
-        m_timeIntegrator(timeIntegrator),
-        m_field(field),
-        m_laplacian(laplacian) {
-            m_fNew = std::make_unique<double[]> (field->m_grid->m_numNode) ;
+        m_logger(logger) {
+            m_fNew = std::make_unique<double[]> (heatProblem->m_field->m_grid->m_numNode) ;
         }
 
     void march() {
-        for (int step = m_timeIntegrator->m_step ; step < m_timeIntegrator->m_nSteps ; step++) {
-            m_laplacian->apply(m_field);
-            if (step == 0) {
-                for (int node = 1; node < (m_field->m_grid->m_numNode)-1; node++) {
-                    m_heatProblem->m_initCond(m_field);
+        for ( ; m_step < m_nSteps ; m_step++) {
+            Laplacian1D::apply(m_heatProblem->m_field);
+            if (m_step == 0) {
+                for (int node = 1; node < (m_heatProblem->m_field->m_grid->m_numNode)-1; node++) {
+                    m_heatProblem->m_initCond(m_heatProblem->m_field);
                 }
-                logFieldState(m_field, step);
             }
-            else for (int node = 1; node < (m_field->m_grid->m_numNode)-1; node++) {
-                m_fNew[node] = m_heatProblem->operator()(m_field, m_timeIntegrator, m_laplacian, node);
-                m_field->m_f[node] = m_fNew[node];
+            else for (int node = 1; node < (m_heatProblem->m_field->m_grid->m_numNode)-1; node++) {
+                m_fNew[node] = m_heatProblem->operator()(this, node);
+                m_heatProblem->m_field->m_f[node] = m_fNew[node];
             }
-            if(step == 10 || step == 20 || step == 40) logFieldState(m_field, step);
+            m_logger->logFieldState(m_heatProblem->m_field, m_step);
         }
     }
 
+private:
     HeatProblem1D* m_heatProblem;
-    TimeIntegrator* m_timeIntegrator;
-    Field1D* m_field;
-    Laplacian1D* m_laplacian;
+    LogFields* m_logger; 
     std::unique_ptr<double[]> m_fNew;
 
 };
@@ -176,30 +195,29 @@ int main() {
     double domLo = 0;
     double domHi = 1;
     int numEl = 20;
-
-
     Grid1D heatGrid(domLo, domHi, numEl);
     Field1D heatField(&heatGrid);
 
-    double dt = 0.005;
-    double totTime = 0.2;
-    TimeIntegrator timeIntegrator(dt, totTime);
-
 
     double alpha = 0.1;
+    //initial condition: f(x) = sin(PI*x)
     std::function<void(Field1D*)> initCond = [](Field1D* field) { 
         for (int node = 1; node < (field->m_grid->m_numNode)-1 ; node++) {
             field->m_f[node] = sin(M_PI*(field->m_grid->x[node]));
         }
     };
 
-    HeatProblem1D heat_problem(alpha, initCond);
-    Laplacian1D laplacian;
 
-    ExplicitEuler fix(&heat_problem, &timeIntegrator, &heatField, &laplacian);
+    HeatProblem1D heat_problem(&heatField, alpha, initCond);
+
+    int log_every = 5000;
+    LogFields logger(log_every);
+
+    double dt = 0.05;
+    double totTime = 5000;
+    ExplicitEuler fix(&heat_problem, &logger, dt, totTime);
     fix.march();
 
-    
      
     std::cout << "Program ended!" << std::endl;
 }
