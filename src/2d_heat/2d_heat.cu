@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <filesystem>
 
 class Grid2D {
 public:
@@ -138,7 +139,13 @@ void apply_Dirichlet_BC(double bc_val, Field2D& field) {
     for (j = 0; j < field.ny(); j++) field(i, j) = bc_val;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+
+     std::filesystem::path out_dir = (argc > 1) ? argv[1] : ".";
+     std::filesystem::create_directories(out_dir);
+     std::ofstream file(out_dir/"2d_heat_output.csv");
+
+     
 
     int grid_num = 20;
     Grid2D temp_grid(grid_num, grid_num, 1, 1);
@@ -157,8 +164,6 @@ int main() {
 
     Solver2D solver(temp, nsteps, dt, alpha);
     Field2D tempNext(temp_grid);
-
-    std::ofstream file("output.csv");
 
     int j = grid_num/2; //plot line
     for (int timestep = 0; timestep < nsteps; timestep++) {
