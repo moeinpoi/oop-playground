@@ -24,12 +24,6 @@ CMakeCache.txt
 .vscode/
 .idea/
 
-# --- generated data & plots ---
-output/
-*.csv
-*.png
-results/
-
 # --- python cache ---
 __pycache__/
 *.pyc
