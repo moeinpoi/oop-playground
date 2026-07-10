@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-data = np.loadtxt("./output.csv", delimiter=',')
+data = np.loadtxt("./2d_heat_output.csv", delimiter=',')
 
 print(data.shape)
 
