@@ -7,7 +7,6 @@ set(CMAKE_CUDA_STANDARD 17)
 # Set GPU architecture — sm_86 for RTX 3090
 set(CMAKE_CUDA_ARCHITECTURES 86)
 
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O2 --lineinfo")
 
 # CPU baseline executable
 add_executable(heat2d_cpu src/2d_heat/2d_heat.cpp)
