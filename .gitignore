@@ -10,7 +10,7 @@
 *.out
 
 # --- build directories ---
-build/
+build*/
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
