@@ -1,0 +1,35 @@
+# --- macOS ---
+.DS_Store
+
+# --- compiled artifacts ---
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.out
+
+# --- build directories ---
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+
+# --- CUDA ---
+*.ptx
+*.cubin
+*.fatbin
+
+# --- editors/IDEs ---
+.vscode/
+.idea/
+
+# --- generated data & plots ---
+output/
+*.csv
+*.png
+results/
+
+# --- python cache ---
+__pycache__/
+*.pyc
