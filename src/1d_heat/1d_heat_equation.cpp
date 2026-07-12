@@ -82,7 +82,7 @@ struct Laplacian1D {
     static void apply(Field1D* field) {
         double h = field->m_grid->m_elSize;
         for (int node = 1; node < (field->m_grid->m_numNode)-1; node++ ) {
-            field->m_d2f_dx2[node] = (field->m_f[node+1] + field->m_f[node-1] - 2*field->m_f[node]) /  h*h;
+            field->m_d2f_dx2[node] = (field->m_f[node+1] + field->m_f[node-1] - 2*field->m_f[node]) /  (h*h);
         }
     }
 };
