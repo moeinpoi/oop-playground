@@ -96,6 +96,23 @@ private:
 };
 
 
+__global__ void step_kernel(const double* u, double* uNext, int nx, int ny, double r) {
+
+    int j = blockIdx.x*blockDim.x + threadIdx.x;
+    int i = blockIdx.y*blockDim.y + threadIdx.y;
+
+    if (i >= 1 && j >= 1 && i < (nx-1) && j < (ny-1)) {
+        uNext[i*ny + j] = 
+                        u[i*ny + j] + 
+                        r* ( 
+                        u[(i+1)*ny + j] + 
+                        u[(i-1)*ny + j] +
+                        u[(i)*ny + j+1] +
+                        u[(i)*ny + j-1] -
+                        4*u[i*ny + j] );
+    }
+} 
+
 class Solver2D { 
 public:
     Solver2D(Field2D& field, int nsteps, double dt, double alpha) :
@@ -109,13 +126,26 @@ public:
         _r = _alpha*_dt/(_dx*_dx);
     }
 
-void step(Field2D& field, Field2D& fieldNext) {
+void step_cpu(Field2D& field, Field2D& fieldNext) {
     for (int i = 1; i < _nx-1; i++) {
         for (int j = 1; j < _ny-1; j++) {
             (fieldNext)(i,j) = (field)(i,j) + _r*( (field)(i+1,j) + (field)(i-1,j) + (field)(i,j+1) + (field)(i,j-1) - 4*(field)(i,j) );
         }
     }
+}
 
+void step_gpu(Field2D& field, Field2D& fieldNext) {
+
+    const double* u = field.devicePtr();
+    double* uNext = fieldNext.devicePtr();
+
+    dim3 block(32, 8); //fixed for now
+    int blocks_x= (_ny + block.x - 1) / block.x;
+    int blocks_y = (_nx + block.y - 1) / block.y;
+    dim3 grid(blocks_x, blocks_y);
+
+    step_kernel<<<grid, block>>>(u, uNext, _nx, _ny, _r);
+    
 }
 
 private: 
@@ -123,8 +153,6 @@ private:
     double _dx, _dy;
     int _nsteps;
     double _dt, _alpha, _r;
-
-
 };
 
 void apply_Dirichlet_BC(double bc_val, Field2D& field) {
@@ -177,7 +205,9 @@ int main(int argc, char* argv[]) {
         }
         file << std::endl;
 
-        solver.step(temp, tempNext);
+        temp.toDevice();
+        solver.step_gpu(temp, tempNext);
+        tempNext.toHost();
         std::swap(temp, tempNext);
     }
         
