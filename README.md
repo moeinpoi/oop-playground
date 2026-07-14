@@ -17,6 +17,7 @@ condition, solver, time integrator).
 ## Roadmap
 
 - Additional physics: fluid flow, structural mechanics
+- Lattice Boltzmann (D2Q9) solver
 - Kokkos backends for hardware-agnostic parallelism
 - Long-term: an open-source interface for FSI problems in microfluidics
 
