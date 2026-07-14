@@ -17,9 +17,7 @@ public:
                 x[i] = i*m_elSize;
             }
         }
-    virtual ~Grid1D() {
-        std::cout << "Grid1D destructed!" << std::endl;
-    }
+    virtual ~Grid1D() {}
     void printGrid () {
         for (int i = 0; i < m_numNode; i++) {
             std::cout << "Node: " << i << ", x= " << x[i] << std::endl;
@@ -33,7 +31,6 @@ public:
     std::unique_ptr<double[]> x;
 
 };
-
 /*--------------*/
 
 class Field1D {
@@ -213,7 +210,7 @@ int main() {
     int log_every = 5000;
     LogFields logger(log_every);
 
-    double dt = 0.05;
+    double dt = 0.01;
     double totTime = 5000;
     ExplicitEuler fix(&heat_problem, &logger, dt, totTime);
     fix.march();
