@@ -2,6 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <filesystem>
+#include <iomanip>
 
 class Grid2D {
 public:
@@ -88,7 +89,8 @@ int main(int argc, char* argv[]) {
 
      std::filesystem::path out_dir = (argc > 1) ? argv[1] : ".";
      std::filesystem::create_directories(out_dir);
-     std::ofstream file(out_dir/"2d_heat_output.csv");
+     std::ofstream file(out_dir/"2d_heat_output_cpu.csv");
+     file << std::setprecision(17);
 
 
     int grid_num = 20;
